@@ -33,8 +33,11 @@ COPY --from=deps /app/package.json /app/package.json
 COPY --from=deps /app/pnpm-workspace.yaml /app/pnpm-workspace.yaml
 COPY --from=deps /app/pnpm-lock.yaml /app/pnpm-lock.yaml
 
-# bring node_modules and app build output
+# bring node_modules from deps (workspace root AND the app package)
 COPY --from=deps /app/node_modules /app/node_modules
+COPY --from=deps /app/apps/web/node_modules /app/apps/web/node_modules
+
+# bring app build output and public assets
 COPY --from=build /app/apps/web/.next /app/apps/web/.next
 COPY --from=build /app/apps/web/package.json /app/apps/web/package.json
 COPY --from=build /app/apps/web/public /app/apps/web/public
