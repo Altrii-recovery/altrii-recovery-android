@@ -10,7 +10,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 # copy app manifest so pnpm can hoist correctly
 COPY apps/web/package.json apps/web/package.json
 # install deps (workspace-aware)
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # --- build layer ---
 FROM deps AS build
