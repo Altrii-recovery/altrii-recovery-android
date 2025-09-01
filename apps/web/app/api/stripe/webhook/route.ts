@@ -1,8 +1,8 @@
 import Stripe from "stripe";
 import { prisma } from "@/lib/db";
 
-// IMPORTANT: Next.js App Router gives us the raw body via req.text(), which is required for Stripe
-export const runtime = "nodejs"; // ensure Node runtime
+// Ensure Node runtime so we can read raw body
+export const runtime = "nodejs";
 
 export async function POST(req: Request) {
   const sig = req.headers.get("stripe-signature");
@@ -25,7 +25,8 @@ export async function POST(req: Request) {
 
         const user = await prisma.user.findFirst({ where: { stripeCustomerId: customerId } });
         if (user) {
-          const sub = await stripe.subscriptions.retrieve(subId);
+          // In this SDK, retrieve() returns Stripe.Response<Subscription>
+          const { data: sub } = await stripe.subscriptions.retrieve(subId);
           await prisma.subscription.upsert({
             where: { stripeSubId: sub.id },
             update: {
@@ -47,6 +48,7 @@ export async function POST(req: Request) {
     }
     case "customer.subscription.updated":
     case "customer.subscription.deleted": {
+      // Here event carries a plain Subscription already
       const sub = event.data.object as Stripe.Subscription;
       const plan = detectPlanFromItems(sub);
       await prisma.subscription.upsert({
