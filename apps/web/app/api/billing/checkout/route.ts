@@ -17,7 +17,7 @@ export async function POST(req: Request) {
     return new Response("Invalid plan", { status: 400 });
   }
 
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" });
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
   // Ensure Stripe customer
   let customerId = user.stripeCustomerId || undefined;
