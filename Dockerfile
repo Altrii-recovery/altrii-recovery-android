@@ -12,6 +12,9 @@ RUN pnpm install --frozen-lockfile --ignore-scripts
 # --- build ---
 FROM deps AS build
 COPY . .
+# Generate Prisma Client for type-checking during build
+RUN pnpm -C apps/web exec prisma generate --schema=prisma/schema.prisma
+# Build Next.js
 RUN pnpm -C apps/web build
 
 # --- runtime ---
@@ -32,10 +35,10 @@ COPY --from=deps  /app/apps/web/node_modules     /app/apps/web/node_modules
 COPY --from=build /app/apps/web/.next            /app/apps/web/.next
 COPY --from=build /app/apps/web/package.json     /app/apps/web/package.json
 COPY --from=build /app/apps/web/public           /app/apps/web/public
-# include prisma schema
+# include prisma schema for runtime generate
 COPY --from=build /app/apps/web/prisma           /app/apps/web/prisma
 
-# ✅ generate Prisma Client in runtime with explicit schema path
+# Generate Prisma Client again in the runtime image (ensures it exists at run)
 RUN pnpm -C apps/web exec prisma generate --schema=prisma/schema.prisma
 
 CMD ["pnpm", "-C", "apps/web", "start"]
