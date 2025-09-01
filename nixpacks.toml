@@ -1,0 +1,19 @@
+# Install phase
+[phases.install]
+cmds = [
+  "corepack enable",
+  "corepack prepare pnpm@9 --activate || true",
+  "pnpm install --frozen-lockfile",
+  # ensure Prisma client is generated for the app
+  "pnpm -C apps/web exec prisma generate"
+]
+
+# Build phase
+[phases.build]
+cmds = [
+  "pnpm -C apps/web build"
+]
+
+# Start phase
+[start]
+cmd = "pnpm -C apps/web start"
