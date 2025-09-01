@@ -3,13 +3,12 @@ WORKDIR /app
 
 # --- deps layer ---
 FROM base AS deps
-# install pnpm directly (avoid corepack signature issues)
 RUN npm i -g pnpm@9
-# copy root manifests
+# copy workspace manifests
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 # copy app manifest so pnpm can hoist correctly
 COPY apps/web/package.json apps/web/package.json
-# install deps (workspace-aware)
+# install deps (no postinstall yet)
 RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # --- build layer ---
@@ -22,14 +21,23 @@ RUN pnpm -C apps/web build
 
 # --- runtime layer ---
 FROM base AS runner
-RUN npm i -g pnpm@9
 ENV NODE_ENV=production
 ENV PORT=8080
 EXPOSE 8080
-# bring node_modules and built output
+
+# have pnpm available in runner
+RUN npm i -g pnpm@9
+
+# bring workspace manifests so pnpm can resolve the workspace correctly
+COPY --from=deps /app/package.json /app/package.json
+COPY --from=deps /app/pnpm-workspace.yaml /app/pnpm-workspace.yaml
+COPY --from=deps /app/pnpm-lock.yaml /app/pnpm-lock.yaml
+
+# bring node_modules and app build output
 COPY --from=deps /app/node_modules /app/node_modules
 COPY --from=build /app/apps/web/.next /app/apps/web/.next
 COPY --from=build /app/apps/web/package.json /app/apps/web/package.json
 COPY --from=build /app/apps/web/public /app/apps/web/public
+
 # start Next.js in apps/web
 CMD ["pnpm", "-C", "apps/web", "start"]
