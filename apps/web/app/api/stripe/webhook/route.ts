@@ -9,6 +9,18 @@ function asSubscription(x: any): Stripe.Subscription {
   return (x && x.data && x.data.object === "subscription") ? x.data as Stripe.Subscription : x as Stripe.Subscription;
 }
 
+// TS-safe getter for current period end (Stripe types vary by SDK/API version)
+function getCurrentPeriodEnd(sub: any): Date {
+  const t =
+    sub?.current_period_end ??
+    sub?.current_period_end_at ??  // some SDKs
+    sub?.currentPeriodEnd ??       // very new camelCase
+    0;
+  const n = Number(t) || 0;
+  // If Stripe returns ms in the future (unlikely here), normalize
+  return new Date(n > 1e12 ? n : n * 1000);
+}
+
 export async function POST(req: Request) {
   const sig = req.headers.get("stripe-signature");
   const rawBody = await req.text();
@@ -35,15 +47,15 @@ export async function POST(req: Request) {
           await prisma.subscription.upsert({
             where: { stripeSubId: sub.id },
             update: {
-              status: sub.status.toUpperCase() as any,
-              currentPeriodEnd: new Date(sub.current_period_end * 1000),
+              status: (sub.status as string).toUpperCase() as any,
+              currentPeriodEnd: getCurrentPeriodEnd(sub),
               plan: detectPlanFromItems(sub),
             },
             create: {
               userId: user.id,
               stripeSubId: sub.id,
-              status: sub.status.toUpperCase() as any,
-              currentPeriodEnd: new Date(sub.current_period_end * 1000),
+              status: (sub.status as string).toUpperCase() as any,
+              currentPeriodEnd: getCurrentPeriodEnd(sub),
               plan: detectPlanFromItems(sub),
             },
           });
@@ -58,15 +70,15 @@ export async function POST(req: Request) {
       await prisma.subscription.upsert({
         where: { stripeSubId: sub.id },
         update: {
-          status: sub.status.toUpperCase() as any,
-          currentPeriodEnd: new Date(sub.current_period_end * 1000),
+          status: (sub.status as string).toUpperCase() as any,
+          currentPeriodEnd: getCurrentPeriodEnd(sub),
           plan,
         },
         create: {
           userId: await findUserIdByCustomer(sub.customer),
           stripeSubId: sub.id,
-          status: sub.status.toUpperCase() as any,
-          currentPeriodEnd: new Date(sub.current_period_end * 1000),
+          status: (sub.status as string).toUpperCase() as any,
+          currentPeriodEnd: getCurrentPeriodEnd(sub),
           plan,
         },
       });
@@ -79,7 +91,7 @@ export async function POST(req: Request) {
 
 // Helpers
 function detectPlanFromItems(sub: Stripe.Subscription) {
-  const priceId = sub.items.data[0]?.price?.id || "";
+  const priceId = sub.items?.data?.[0]?.price?.id || "";
   if (priceId === process.env.STRIPE_PRICE_MONTHLY) return "MONTHLY";
   if (priceId === process.env.STRIPE_PRICE_QUARTERLY) return "QUARTERLY";
   if (priceId === process.env.STRIPE_PRICE_SEMIANNUAL) return "SEMIANNUAL";
