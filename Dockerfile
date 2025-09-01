@@ -22,6 +22,7 @@ RUN pnpm -C apps/web build
 
 # --- runtime layer ---
 FROM base AS runner
+RUN npm i -g pnpm@9
 ENV NODE_ENV=production
 ENV PORT=8080
 EXPOSE 8080
