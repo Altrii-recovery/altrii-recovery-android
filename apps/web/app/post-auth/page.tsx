@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
 import { prisma } from "@/lib/db";
 
-export default async function HomePage() {
+export default async function PostAuth() {
   const session = await getServerSession(authOptions as any);
   if (!session?.uid) return redirect("/auth/signup");
 

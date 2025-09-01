@@ -1,43 +1,37 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
-import { prisma } from "@/lib/db";
 
-const PUBLIC_PATHS = [
-  "/",
+const PUBLIC_PREFIXES = [
   "/auth/signin",
   "/auth/signup",
-  "/api/health",
+  "/api/auth",              // next-auth internal
   "/api/stripe/webhook",
-  "/favicon.ico",
-  "/_next", "/assets", "/images"
+  "/api/health",
+  "/_next", "/favicon.ico", "/assets", "/images"
 ];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  if (PUBLIC_PATHS.some(p => pathname.startsWith(p))) return NextResponse.next();
+
+  // Always allow public assets and auth pages
+  if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) return NextResponse.next();
 
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-  if (!token?.uid) {
-    const url = req.nextUrl.clone(); url.pathname = "/auth/signin"; return NextResponse.redirect(url);
+  const isAuthed = Boolean(token?.uid);
+
+  // If not signed in, send to Sign Up
+  if (!isAuthed) {
+    const url = req.nextUrl.clone(); url.pathname = "/auth/signup"; return NextResponse.redirect(url);
   }
 
-  // Allow billing pages without active sub
+  // Allow billing (to let users purchase)
   if (pathname.startsWith("/dashboard/billing") || pathname.startsWith("/api/billing")) {
     return NextResponse.next();
   }
 
-  // Require active subscription elsewhere
-  const sub = await prisma.subscription.findFirst({
-    where: { userId: String(token.uid), status: { in: ["ACTIVE","TRIALING","PAST_DUE"] } },
-    orderBy: { updatedAt: "desc" }
-  });
-  if (!sub) {
-    const url = req.nextUrl.clone(); url.pathname = "/dashboard/billing"; return NextResponse.redirect(url);
-  }
+  // Everything else can proceed; /post-auth and / devices redirect logic handled in pages
   return NextResponse.next();
 }
 
-export const config = {
-  matcher: ["/((?!api/stripe/webhook).*)"],
-};
+export const config = { matcher: ["/((?!api/stripe/webhook).*)"] };
