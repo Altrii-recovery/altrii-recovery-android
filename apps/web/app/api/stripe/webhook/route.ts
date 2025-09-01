@@ -4,6 +4,11 @@ import { prisma } from "@/lib/db";
 // Ensure Node runtime so we can read raw body
 export const runtime = "nodejs";
 
+function asSubscription(x: any): Stripe.Subscription {
+  // Handle both Response<Subscription> and Subscription
+  return (x && x.data && x.data.object === "subscription") ? x.data as Stripe.Subscription : x as Stripe.Subscription;
+}
+
 export async function POST(req: Request) {
   const sig = req.headers.get("stripe-signature");
   const rawBody = await req.text();
@@ -25,8 +30,8 @@ export async function POST(req: Request) {
 
         const user = await prisma.user.findFirst({ where: { stripeCustomerId: customerId } });
         if (user) {
-          // In this SDK, retrieve() returns Stripe.Response<Subscription>
-          const { data: sub } = await stripe.subscriptions.retrieve(subId);
+          const subRaw = await stripe.subscriptions.retrieve(subId);
+          const sub = asSubscription(subRaw);
           await prisma.subscription.upsert({
             where: { stripeSubId: sub.id },
             update: {
@@ -48,8 +53,7 @@ export async function POST(req: Request) {
     }
     case "customer.subscription.updated":
     case "customer.subscription.deleted": {
-      // Here event carries a plain Subscription already
-      const sub = event.data.object as Stripe.Subscription;
+      const sub = asSubscription(event.data.object as any);
       const plan = detectPlanFromItems(sub);
       await prisma.subscription.upsert({
         where: { stripeSubId: sub.id },
