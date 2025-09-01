@@ -1,4 +1,4 @@
-import NextAuth, { type AuthOptions } from "next-auth";
+import type { AuthOptions } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/db";
@@ -23,7 +23,7 @@ export const authOptions: AuthOptions = {
   ],
   pages: { signIn: "/auth/signin" },
   callbacks: {
-    async jwt({ token, user }) { if (user?.id) token.uid = user.id; return token; },
-    async session({ session, token }) { if (token?.uid) (session as any).uid = token.uid; return session; },
+    async jwt({ token, user }) { if ((user as any)?.id) (token as any).uid = (user as any).id; return token; },
+    async session({ session, token }) { if ((token as any)?.uid) (session as any).uid = (token as any).uid; return session; },
   },
 };

@@ -11,8 +11,8 @@ importers:
   apps/web:
     dependencies:
       '@auth/prisma-adapter':
-        specifier: ^2.10.0
-        version: 2.10.0(@prisma/client@6.15.0(prisma@6.15.0(typescript@5.9.2))(typescript@5.9.2))
+        specifier: ^1.6.0
+        version: 1.6.0(@prisma/client@6.15.0(prisma@6.15.0(typescript@5.9.2))(typescript@5.9.2))
       '@prisma/client':
         specifier: ^6.15.0
         version: 6.15.0(prisma@6.15.0(typescript@5.9.2))(typescript@5.9.2)
@@ -90,6 +90,20 @@ packages:
     resolution: {integrity: sha512-UrcABB+4bUrFABwbluTIBErXwvbsU/V7TZWfmbgJfbkwiBuziS9gxdODUyuiecfdGQ85jglMW6juS3+z5TsKLw==}
     engines: {node: '>=10'}
 
+  '@auth/core@0.29.0':
+    resolution: {integrity: sha512-MdfEjU6WRjUnPG1+XeBWrTIlAsLZU6V0imCIqVDDDPxLI6UZWldXVqAA2EsDazGofV78jqiCLHaN85mJITDqdg==}
+    peerDependencies:
+      '@simplewebauthn/browser': ^9.0.1
+      '@simplewebauthn/server': ^9.0.2
+      nodemailer: ^6.8.0
+    peerDependenciesMeta:
+      '@simplewebauthn/browser':
+        optional: true
+      '@simplewebauthn/server':
+        optional: true
+      nodemailer:
+        optional: true
+
   '@auth/core@0.40.0':
     resolution: {integrity: sha512-n53uJE0RH5SqZ7N1xZoMKekbHfQgjd0sAEyUbE+IYJnmuQkbvuZnXItCU7d+i7Fj8VGOgqvNO7Mw4YfBTlZeQw==}
     peerDependencies:
@@ -104,10 +118,10 @@ packages:
       nodemailer:
         optional: true
 
-  '@auth/prisma-adapter@2.10.0':
-    resolution: {integrity: sha512-EliOQoTjGK87jWWqnJvlQjbR4PjQZQqtwRwPAe108WwT9ubuuJJIrL68aNnQr4hFESz6P7SEX2bZy+y2yL37Gw==}
+  '@auth/prisma-adapter@1.6.0':
+    resolution: {integrity: sha512-PQU8/Oi5gfjzb0MkhMGVX0Dg877phPzsQdK54+C7ubukCeZPjyvuSAx1vVtWEYVWp2oQvjgG/C6QiDoeC7S10A==}
     peerDependencies:
-      '@prisma/client': '>=2.26.0 || >=3 || >=4 || >=5 || >=6'
+      '@prisma/client': '>=2.26.0 || >=3 || >=4 || >=5'
 
   '@babel/runtime@7.28.3':
     resolution: {integrity: sha512-9uIQ10o0WGdpP6GDhXcdOJPJuDgFtIDtN/9+ArJQ2NAfAmiuhTQdzkaTGR33v43GYS2UrSA0eX2pPPHoFVvpxA==}
@@ -459,6 +473,9 @@ packages:
 
   '@tybys/wasm-util@0.10.0':
     resolution: {integrity: sha512-VyyPYFlOMNylG45GoAe0xDoLwWuowvf92F9kySqzYh8vmYm7D2u4iUJKa1tOUpS70Ku13ASrOkS4ScXFsTaCNQ==}
+
+  '@types/cookie@0.6.0':
+    resolution: {integrity: sha512-4Kh9a6B2bQciAhf7FSuMRRkUWecJgJu9nPnx3yzpsfXX/c50REIqpHY4C82bXP90qrLtXtkDxTZosYO3UpOwlA==}
 
   '@types/json5@0.0.29':
     resolution: {integrity: sha512-dRLjCWHYg4oaA77cxO64oO+7JwCwnIzkZPdrrC71jQmQtlhM556pwKo5bUzqvZndkVbeFLIIi+9TC40JNF5hNQ==}
@@ -813,6 +830,10 @@ packages:
   consola@3.4.2:
     resolution: {integrity: sha512-5IKcdX0nnYavi6G7TtOhwkYzyjfJlatbjMjuLSfE2kYT5pMDOilZ4OvMhi637CcDICTmz3wARPoyhqyX1Y+XvA==}
     engines: {node: ^14.18.0 || >=16.10.0}
+
+  cookie@0.6.0:
+    resolution: {integrity: sha512-U71cyTamuh1CRNCfpGY6to28lxvNwPG4Guz/EVjgf3Jmzv0vlDp1atT9eS5dDjMYHucpHbWns6Lwf3BKz6svdw==}
+    engines: {node: '>= 0.6'}
 
   cookie@0.7.2:
     resolution: {integrity: sha512-yki5XnKuf750l50uGTllt6kKILY4nQ1eNIQatoXEByZ5dWgnKqbnqmTrBE5B4N7lrMJKQ2ytWMiTO2o0v6Ew/w==}
@@ -1409,6 +1430,9 @@ packages:
   jose@4.15.9:
     resolution: {integrity: sha512-1vUQX+IdDMVPj4k8kOxgUqlcK518yluMuGZwqlr44FS1ppZB/5GWh4rZG89erpOBOJjU/OBsnCVFfapsRz6nEA==}
 
+  jose@5.10.0:
+    resolution: {integrity: sha512-s+3Al/p9g32Iq+oqXxkW//7jk2Vig6FF1CFqzVXoTUXt2qz89YWbL+OwS17NFYEvxC35n0FKeGO2LGYSxeM2Gg==}
+
   jose@6.1.0:
     resolution: {integrity: sha512-TTQJyoEoKcC1lscpVDCSsVgYzUDg/0Bt3WE//WiTPK6uOCQC2KZS4MpugbMWt/zyjkopgZoXhZuCi00gLudfUA==}
 
@@ -1604,6 +1628,9 @@ packages:
     engines: {node: ^14.16.0 || >=16.10.0}
     hasBin: true
 
+  oauth4webapi@2.17.0:
+    resolution: {integrity: sha512-lbC0Z7uzAFNFyzEYRIC+pkSVvDHJTbEW+dYlSBAlCYDe6RxUkJ26bClhk8ocBZip1wfI9uKTe0fm4Ib4RHn6uQ==}
+
   oauth4webapi@3.8.1:
     resolution: {integrity: sha512-olkZDELNycOWQf9LrsELFq8n05LwJgV8UkrS0cburk6FOwf8GvLam+YB+Uj5Qvryee+vwWOfQVeI5Vm0MVg7SA==}
 
@@ -1786,6 +1813,11 @@ packages:
     resolution: {integrity: sha512-3Ybi1tAuwAP9s0r1UQ2J4n5Y0G05bJkpUIO0/bI9MhwmD70S5aTWbXGBwxHrelT+XM1k6dM0pk+SwNkpTRN7Pg==}
     engines: {node: ^10 || ^12 || >=14}
 
+  preact-render-to-string@5.2.3:
+    resolution: {integrity: sha512-aPDxUn5o3GhWdtJtW0svRC2SS/l8D9MAgo2+AWml+BhDImb27ALf04Q2d+AHqUUOc6RdSXFIBVa2gxzgMKgtZA==}
+    peerDependencies:
+      preact: '>=10'
+
   preact-render-to-string@5.2.6:
     resolution: {integrity: sha512-JyhErpYOvBV1hEPwIxc/fHWXPfnEGdRKxc8gFdAZ7XV4tlzyzG847XAyEZqoDnynP88akM4eaHcSOzNcLWFguw==}
     peerDependencies:
@@ -1795,6 +1827,9 @@ packages:
     resolution: {integrity: sha512-ubnauqoGczeGISiOh6RjX0/cdaF8v/oDXIjO85XALCQjwQP+SB4RDXXtvZ6yTYSjG+PC1QRP2AhPgCEsM2EvUw==}
     peerDependencies:
       preact: '>=10'
+
+  preact@10.11.3:
+    resolution: {integrity: sha512-eY93IVpod/zG3uMF22Unl8h9KkrcKIRs2EGar8hwLZZDU1lkjph303V9HZBwufh2s736U6VXuhD109LYqPoffg==}
 
   preact@10.24.3:
     resolution: {integrity: sha512-Z2dPnBnMUfyQfSQ+GBdsGa16hz35YmLmtTLhM169uW944hYL6xzTYkJjC07j+Wosz733pMWx0fgON3JNw1jJQA==}
@@ -2225,6 +2260,16 @@ snapshots:
 
   '@alloc/quick-lru@5.2.0': {}
 
+  '@auth/core@0.29.0':
+    dependencies:
+      '@panva/hkdf': 1.2.1
+      '@types/cookie': 0.6.0
+      cookie: 0.6.0
+      jose: 5.10.0
+      oauth4webapi: 2.17.0
+      preact: 10.11.3
+      preact-render-to-string: 5.2.3(preact@10.11.3)
+
   '@auth/core@0.40.0':
     dependencies:
       '@panva/hkdf': 1.2.1
@@ -2232,10 +2277,11 @@ snapshots:
       oauth4webapi: 3.8.1
       preact: 10.24.3
       preact-render-to-string: 6.5.11(preact@10.24.3)
+    optional: true
 
-  '@auth/prisma-adapter@2.10.0(@prisma/client@6.15.0(prisma@6.15.0(typescript@5.9.2))(typescript@5.9.2))':
+  '@auth/prisma-adapter@1.6.0(@prisma/client@6.15.0(prisma@6.15.0(typescript@5.9.2))(typescript@5.9.2))':
     dependencies:
-      '@auth/core': 0.40.0
+      '@auth/core': 0.29.0
       '@prisma/client': 6.15.0(prisma@6.15.0(typescript@5.9.2))(typescript@5.9.2)
     transitivePeerDependencies:
       - '@simplewebauthn/browser'
@@ -2507,6 +2553,8 @@ snapshots:
     dependencies:
       tslib: 2.8.1
     optional: true
+
+  '@types/cookie@0.6.0': {}
 
   '@types/json5@0.0.29': {}
 
@@ -2855,6 +2903,8 @@ snapshots:
   confbox@0.2.2: {}
 
   consola@3.4.2: {}
+
+  cookie@0.6.0: {}
 
   cookie@0.7.2: {}
 
@@ -3649,7 +3699,10 @@ snapshots:
 
   jose@4.15.9: {}
 
-  jose@6.1.0: {}
+  jose@5.10.0: {}
+
+  jose@6.1.0:
+    optional: true
 
   js-tokens@4.0.0: {}
 
@@ -3844,7 +3897,10 @@ snapshots:
       pkg-types: 2.3.0
       tinyexec: 1.0.1
 
-  oauth4webapi@3.8.1: {}
+  oauth4webapi@2.17.0: {}
+
+  oauth4webapi@3.8.1:
+    optional: true
 
   oauth@0.9.15: {}
 
@@ -4018,6 +4074,11 @@ snapshots:
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
+  preact-render-to-string@5.2.3(preact@10.11.3):
+    dependencies:
+      preact: 10.11.3
+      pretty-format: 3.8.0
+
   preact-render-to-string@5.2.6(preact@10.27.1):
     dependencies:
       preact: 10.27.1
@@ -4026,8 +4087,12 @@ snapshots:
   preact-render-to-string@6.5.11(preact@10.24.3):
     dependencies:
       preact: 10.24.3
+    optional: true
 
-  preact@10.24.3: {}
+  preact@10.11.3: {}
+
+  preact@10.24.3:
+    optional: true
 
   preact@10.27.1: {}
 
