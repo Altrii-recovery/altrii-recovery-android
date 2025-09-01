@@ -8,7 +8,6 @@ dist
 apps/web/.env
 .DS_Store
 # Package manager
-pnpm-lock.yaml
 # Tests / coverage
 coverage
 # Logs
