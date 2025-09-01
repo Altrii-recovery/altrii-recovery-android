@@ -1,0 +1,81 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String   @id @default(cuid())
+  email            String   @unique
+  name             String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  stripeCustomerId String?  @unique
+  devices          Device[]
+  subscriptions    Subscription[]
+}
+
+model Device {
+  id           String         @id @default(cuid())
+  user         User           @relation(fields: [userId], references: [id])
+  userId       String
+  platform     Platform
+  name         String
+  registeredAt DateTime       @default(now())
+  lastSeenAt   DateTime?
+  lockUntil    DateTime?
+  settings     DeviceSettings?
+}
+
+enum Platform {
+  ANDROID
+  IOS
+  MACOS
+  WINDOWS
+}
+
+model DeviceSettings {
+  id            String   @id @default(cuid())
+  device        Device   @relation(fields: [deviceId], references: [id])
+  deviceId      String   @unique
+  blockAdult    Boolean  @default(true)
+  blockGambling Boolean  @default(true)
+  blockSocial   Boolean  @default(false)
+  blockYouTube  Boolean  @default(false)
+  blockVPN      Boolean  @default(true)
+  rulesVersion  Int      @default(1)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Subscription {
+  id               String    @id @default(cuid())
+  user             User      @relation(fields: [userId], references: [id])
+  userId           String
+  stripeSubId      String    @unique
+  plan             Plan
+  status           SubStatus
+  currentPeriodEnd DateTime
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
+
+enum Plan {
+  MONTHLY
+  QUARTERLY
+  SEMIANNUAL
+  ANNUAL
+}
+
+enum SubStatus {
+  INCOMPLETE
+  INCOMPLETE_EXPIRED
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  UNPAID
+}
