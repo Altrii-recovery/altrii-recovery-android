@@ -12,3 +12,24 @@ body { @apply bg-[#0b1020] text-white antialiased; }
 .btn-ghost { @apply btn bg-white/5 hover:bg-white/10; }
 .input { @apply w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2; }
 .label { @apply text-sm text-[--muted]; }
+
+/* === Altrii Theme (stable) === */
+:root{
+  --bg: #0B1220;         /* page background (very dark blue) */
+  --fg: #F8FAFC;         /* default text (near-white) */
+  --muted: #9AA4B2;      /* secondary text */
+  --card: #101826;       /* cards & header/footer surface */
+  --border: #1F2A3A;     /* subtle borders/dividers */
+  --brand: #4F46E5;      /* brand accent (indigo-600) */
+  --brand-contrast: #E0E7FF;
+}
+html, body { background: var(--bg); color: var(--fg); }
+a { color: var(--brand); }
+hr { border-color: var(--border); }
+.header-surface, .footer-surface { background: var(--card); border-color: var(--border); }
+.link-muted { color: var(--muted); }
+.btn-primary {
+  background: var(--brand); color: var(--brand-contrast);
+  padding: .5rem .9rem; border-radius: .75rem;
+}
+.btn-primary:hover { filter: brightness(1.1); }
