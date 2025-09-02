@@ -1,95 +1,158 @@
 "use client";
-import { useEffect, useState } from "react";
 
-type Settings = {
-  blockAdult: boolean; blockGambling: boolean; blockSocial: boolean;
-  blockYouTube: boolean; blockVPN: boolean;
-};
+import { useMemo, useState } from "react";
+import useSWR from "swr";
+
 type Device = {
-  id: string; name: string; platform: string; lockUntil?: string | null; settings: Settings;
+  id: string;
+  name: string;
+  platform: "ANDROID" | "IOS" | "MACOS" | "WINDOWS" | "LINUX" | "OTHER";
+  registeredAt: string;
+  lastSeenAt?: string | null;
+  lockUntil?: string | null; // ISO from API
 };
 
-export default function Devices() {
-  const [devices, setDevices] = useState<Device[]>([]);
-  const [creating, setCreating] = useState(false);
+const fetcher = (url: string) => fetch(url).then((r) => {
+  if (!r.ok) throw new Error("Failed to fetch");
+  return r.json();
+});
 
-  async function load() {
-    const r = await fetch("/api/devices", { headers: { "x-user": "dev@example.com" } });
-    setDevices(await r.json());
-  }
-  useEffect(() => { load(); }, []);
+function isLocked(lockUntil?: string | null) {
+  if (!lockUntil) return false;
+  const t = new Date(lockUntil).getTime();
+  return Number.isFinite(t) && t > Date.now();
+}
 
-  async function createDevice() {
-    setCreating(true);
-    await fetch("/api/devices", {
+export default function DevicesPage() {
+  const { data, error, isLoading, mutate } = useSWR<Device[]>("/api/devices", fetcher);
+  const [name, setName] = useState("");
+  const [platform, setPlatform] = useState<Device["platform"]>("ANDROID");
+
+  const devices = useMemo(() => data ?? [], [data]);
+
+  const addDevice = async () => {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      alert("Please enter a device name.");
+      return;
+    }
+    const res = await fetch("/api/devices", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-user": "dev@example.com" },
-      body: JSON.stringify({ name: "My Android", platform: "ANDROID" })
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: trimmed, platform }),
     });
-    setCreating(false);
-    load();
-  }
+    if (!res.ok) {
+      const msg = await res.text().catch(() => "Failed");
+      alert(`Add failed: ${msg}`);
+      return;
+    }
+    setName("");
+    await mutate();
+  };
 
-  async function toggle(id: string, key: keyof Settings) {
-    const d = devices.find(x => x.id === id)!;
-    const s = { ...d.settings, [key]: !d.settings[key] };
-    await fetch(`/api/devices/${id}/settings`, {
+  const deleteDevice = async (id: string) => {
+    if (!confirm("Delete this device? This cannot be undone.")) return;
+    const res = await fetch(`/api/devices/${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      const msg = await res.text().catch(() => "Failed");
+      alert(`Delete failed: ${msg}`);
+      return;
+    }
+    await mutate();
+  };
+
+  const lockDevice = async (id: string) => {
+    const input = prompt("Lock for how many days? (1–30)");
+    if (!input) return;
+    const days = Math.max(1, Math.min(30, Math.floor(Number(input))));
+    if (!Number.isFinite(days)) return alert("Please enter a number of days (1–30).");
+    if (!confirm(`Are you sure you want to lock this device for ${days} day(s)? You won't be able to delete it until the lock expires.`)) return;
+
+    const lockUntil = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+    const res = await fetch(`/api/devices/${id}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json", "x-user": "dev@example.com" },
-      body: JSON.stringify(s)
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lockUntil }),
     });
-    load();
-  }
-
-  async function lock(id: string, days: number) {
-    await fetch(`/api/devices/${id}/lock`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-user": "dev@example.com" },
-      body: JSON.stringify({ days })
-    });
-    load();
-  }
+    if (!res.ok) {
+      const msg = await res.text().catch(() => "Failed");
+      alert(`Lock failed: ${msg}`);
+      return;
+    }
+    await mutate();
+  };
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Your devices</h1>
-        <button className="btn-primary" onClick={createDevice} disabled={creating}>
-          {creating ? "Creating…" : "Add Android device"}
-        </button>
+      <h1 className="text-2xl font-bold">My Devices</h1>
+
+      <div className="flex flex-col md:flex-row gap-2 md:items-end">
+        <div className="flex-1">
+          <label className="block text-sm mb-1">Device name</label>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g., Alex’s Pixel 8"
+            className="w-full rounded border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[var(--fg)]"
+          />
+        </div>
+        <div>
+          <label className="block text-sm mb-1">Platform</label>
+          <select
+            value={platform}
+            onChange={(e) => setPlatform(e.target.value as Device["platform"])}
+            className="rounded border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[var(--fg)]"
+          >
+            <option value="ANDROID">Android</option>
+            <option value="IOS">iOS</option>
+            <option value="MACOS">macOS</option>
+            <option value="WINDOWS">Windows</option>
+            <option value="LINUX">Linux</option>
+            <option value="OTHER">Other</option>
+          </select>
+        </div>
+        <button onClick={addDevice} className="btn-primary h-[42px]">Add Device</button>
       </div>
-      <div className="grid md:grid-cols-2 gap-6">
-        {devices.map(d => (
-          <div key={d.id} className="card p-6">
-            <div className="flex items-center justify-between">
+
+      {isLoading && <p>Loading…</p>}
+      {error && <p className="text-red-400">Failed to load devices.</p>}
+
+      <ul className="space-y-3">
+        {devices.map((d) => {
+          const locked = isLocked(d.lockUntil);
+          return (
+            <li key={d.id} className="flex items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--card)] px-4 py-3">
               <div>
-                <div className="font-semibold">{d.name}</div>
-                <div className="text-[--muted] text-sm">{d.platform}</div>
+                <div className="font-medium">{d.name}</div>
+                <div className="text-sm link-muted">
+                  {d.platform} • Registered {new Date(d.registeredAt).toLocaleDateString()}
+                  {" • "}
+                  {locked
+                    ? `Locked until ${new Date(d.lockUntil as string).toLocaleString()}`
+                    : "Unlocked"}
+                </div>
               </div>
-              <div className="text-sm">
-                {d.lockUntil
-                  ? <span className="text-emerald-300">Locked until {new Date(d.lockUntil).toLocaleDateString()}</span>
-                  : <span className="text-[--muted]">Unlocked</span>}
-              </div>
-            </div>
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              {(["blockAdult","blockGambling","blockSocial","blockYouTube","blockVPN"] as const).map(k => (
-                <button key={k}
-                  className={`btn ${d.settings[k] ? "btn-primary" : "btn-ghost"}`}
-                  onClick={() => toggle(d.id, k)}>
-                  {d.settings[k] ? "✓" : "✕"} {k.replace("block", "Block ")}
+              <div className="flex gap-2">
+                {!locked && (
+                  <button
+                    onClick={() => deleteDevice(d.id)}
+                    className="rounded bg-red-600 px-3 py-1 text-white"
+                    title="Delete device (only when unlocked)"
+                  >
+                    Delete
+                  </button>
+                )}
+                <button
+                  onClick={() => lockDevice(d.id)}
+                  className="rounded bg-gray-700 px-3 py-1 text-white"
+                >
+                  {locked ? "Locked" : "Lock…"}
                 </button>
-              ))}
-            </div>
-            <div className="mt-4 flex items-center gap-2">
-              <span className="label">Start lock for:</span>
-              {[1,3,7,14,30].map(n => (
-                <button key={n} className="btn-ghost" onClick={() => lock(d.id, n)}>{n}d</button>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
