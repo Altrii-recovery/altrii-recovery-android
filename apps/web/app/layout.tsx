@@ -16,7 +16,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* It shows Sign in/Sign up when logged out, or Devices/Billing when logged in */}
         {/* Paths: /auth/signin, /auth/signup, /dashboard/devices, /dashboard/billing */}
         {/* If you'd like a footer, add it below */}
-        {/* @ts-expect-error Async Server Component */}
         <Header />
         <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>
       </body>
