@@ -28,28 +28,15 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 function SectionCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <section
-      className={clsx(
-        "rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm shadow-md p-5 sm:p-6",
-        className
-      )}
-    >
+    <section className={clsx("rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm shadow-md p-5 sm:p-6", className)}>
       {children}
     </section>
   );
 }
 
 function Pill({
-  active,
-  children,
-  onClick,
-  disabled,
-}: {
-  active: boolean;
-  children: React.ReactNode;
-  onClick?: () => void;
-  disabled?: boolean;
-}) {
+  active, children, onClick, disabled,
+}: { active: boolean; children: React.ReactNode; onClick?: () => void; disabled?: boolean }) {
   return (
     <button
       type="button"
@@ -57,9 +44,7 @@ function Pill({
       onClick={onClick}
       className={clsx(
         "rounded-full px-3 py-1 text-sm border transition",
-        active
-          ? "bg-indigo-600 text-white border-indigo-600"
-          : "bg-transparent text-gray-200 hover:bg-white/10 border-white/15",
+        active ? "bg-indigo-600 text-white border-indigo-600" : "bg-transparent text-gray-200 hover:bg-white/10 border-white/15",
         disabled && "opacity-50 cursor-not-allowed"
       )}
     >
@@ -69,11 +54,7 @@ function Pill({
 }
 
 function Badge({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="inline-flex items-center rounded-full border border-white/15 bg-white/10 px-2 py-0.5 text-xs text-gray-200">
-      {children}
-    </span>
-  );
+  return <span className="inline-flex items-center rounded-full border border-white/15 bg-white/10 px-2 py-0.5 text-xs text-gray-200">{children}</span>;
 }
 
 export default function DevicesPage() {
@@ -84,6 +65,10 @@ export default function DevicesPage() {
   const [name, setName] = useState("");
   const [platform, setPlatform] = useState<Device["platform"]>("ANDROID");
   const canAdd = useMemo(() => name.trim().length > 0, [name]);
+
+  // Pending lock confirmation {deviceId, days}
+  const [pending, setPending] = useState<{ id: string; days: number } | null>(null);
+  const [busy, setBusy] = useState(false);
 
   const isLocked = (d: Device) => !!(d.lockUntil && new Date(d.lockUntil) > new Date());
   const fmt = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateString() : "—");
@@ -107,19 +92,21 @@ export default function DevicesPage() {
     await mutate();
   }
 
-  async function lockForDays(id: string, days: number) {
-    const ok = confirm(
-      `Lock this device for ${days} day(s)?\n\nWhile locked you cannot change settings or delete the device.`
-    );
-    if (!ok) return;
-    const lockUntil = new Date(Date.now() + days * 86400_000).toISOString();
-    const res = await fetch(`/api/devices/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lockUntil }),
-    });
-    if (!res.ok) return alert(await res.text().catch(() => "Lock failed"));
-    await mutate();
+  async function confirmLock(id: string, days: number) {
+    setBusy(true);
+    try {
+      const lockUntil = new Date(Date.now() + days * 86400_000).toISOString();
+      const res = await fetch(`/api/devices/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lockUntil }),
+      });
+      if (!res.ok) return alert(await res.text().catch(() => "Lock failed"));
+      setPending(null);
+      await mutate();
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function saveSettings(d: Device, next: Partial<DeviceSettings>) {
@@ -144,9 +131,7 @@ export default function DevicesPage() {
     <div className="mx-auto max-w-5xl space-y-8">
       <header>
         <h1 className="text-3xl font-semibold text-white">Devices</h1>
-        <p className="text-gray-300 mt-1">
-          Register devices, toggle their blocking, and lock them for a focus period.
-        </p>
+        <p className="text-gray-300 mt-1">Register devices, toggle their blocking, and lock them for a focus period.</p>
       </header>
 
       {/* Add Device */}
@@ -177,9 +162,7 @@ export default function DevicesPage() {
             disabled={!canAdd}
             className={clsx(
               "rounded-lg px-4 py-2 font-medium border transition",
-              canAdd
-                ? "bg-indigo-600 border-indigo-600 text-white hover:bg-indigo-500"
-                : "bg-white/10 border-white/15 text-gray-300 cursor-not-allowed"
+              canAdd ? "bg-indigo-600 border-indigo-600 text-white hover:bg-indigo-500" : "bg-white/10 border-white/15 text-gray-300 cursor-not-allowed"
             )}
           >
             Add device
@@ -191,6 +174,7 @@ export default function DevicesPage() {
       <div className="grid gap-4">
         {devices.map((d) => {
           const locked = isLocked(d);
+          const isPending = pending?.id === d.id;
           return (
             <SectionCard key={d.id} className="space-y-4">
               <div className="flex items-start justify-between gap-3">
@@ -205,13 +189,13 @@ export default function DevicesPage() {
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
-                  {/* Lock presets show only when unlocked */}
-                  {!locked && (
+                  {/* Step 1: choose duration (only when unlocked & not currently confirming) */}
+                  {!locked && !isPending && (
                     <div className="flex flex-wrap gap-1.5">
                       {[1, 7, 14, 21, 30].map((days) => (
                         <button
                           key={days}
-                          onClick={() => lockForDays(d.id, days)}
+                          onClick={() => setPending({ id: d.id, days })}
                           className="rounded-md border border-indigo-500/40 bg-indigo-500/20 px-2.5 py-1.5 text-xs text-indigo-100 hover:bg-indigo-500/30"
                           title={`Lock for ${days} day(s)`}
                         >
@@ -220,20 +204,43 @@ export default function DevicesPage() {
                       ))}
                     </div>
                   )}
-                  {locked && (
-                    <span className="text-xs text-amber-300">
-                      Locked — unlocks {fmt(d.lockUntil)}
-                    </span>
+
+                  {/* Step 2: confirm */}
+                  {isPending && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => confirmLock(d.id, pending!.days)}
+                        disabled={busy}
+                        className={clsx(
+                          "rounded-lg px-3 py-2 text-sm font-medium border transition",
+                          "bg-emerald-600 border-emerald-600 text-white hover:bg-emerald-500",
+                          busy && "opacity-70 cursor-wait"
+                        )}
+                      >
+                        Confirm lock {pending!.days}d
+                      </button>
+                      <button
+                        onClick={() => setPending(null)}
+                        disabled={busy}
+                        className={clsx(
+                          "rounded-lg px-3 py-2 text-sm border transition",
+                          "bg-white/10 border-white/15 text-gray-200 hover:bg-white/15"
+                        )}
+                      >
+                        Cancel
+                      </button>
+                    </div>
                   )}
+
+                  {locked && <span className="text-xs text-amber-300">Locked — unlocks {fmt(d.lockUntil)}</span>}
 
                   <button
                     onClick={() => deleteDevice(d.id)}
-                    disabled={locked}
+                    disabled={locked || busy}
                     className={clsx(
                       "rounded-lg border px-3 py-2 text-sm transition",
-                      locked
-                        ? "border-white/15 bg-white/5 text-gray-400 cursor-not-allowed"
-                        : "border-rose-500/40 bg-rose-500/20 text-rose-200 hover:bg-rose-500/30"
+                      locked ? "border-white/15 bg-white/5 text-gray-400 cursor-not-allowed"
+                            : "border-rose-500/40 bg-rose-500/20 text-rose-200 hover:bg-rose-500/30"
                     )}
                   >
                     Delete
@@ -244,57 +251,18 @@ export default function DevicesPage() {
               <div className="border-t border-white/10 pt-4">
                 <h4 className="text-sm font-semibold text-white mb-3">Block settings</h4>
                 <div className="flex flex-wrap gap-2">
-                  <Pill
-                    active={!!d.settings?.blockAdult}
-                    disabled={locked}
-                    onClick={() =>
-                      saveSettings(d, { blockAdult: !(d.settings?.blockAdult ?? true) })
-                    }
-                  >
-                    Adult
-                  </Pill>
-                  <Pill
-                    active={!!d.settings?.blockGambling}
-                    disabled={locked}
-                    onClick={() =>
-                      saveSettings(d, { blockGambling: !(d.settings?.blockGambling ?? true) })
-                    }
-                  >
-                    Gambling
-                  </Pill>
-                  <Pill
-                    active={!!d.settings?.blockSocial}
-                    disabled={locked}
-                    onClick={() =>
-                      saveSettings(d, { blockSocial: !(d.settings?.blockSocial ?? false) })
-                    }
-                  >
-                    Social
-                  </Pill>
-                  <Pill
-                    active={!!d.settings?.blockYouTube}
-                    disabled={locked}
-                    onClick={() =>
-                      saveSettings(d, { blockYouTube: !(d.settings?.blockYouTube ?? false) })
-                    }
-                  >
-                    YouTube
-                  </Pill>
-                  <Pill
-                    active={!!d.settings?.blockVPN}
-                    disabled={locked}
-                    onClick={() =>
-                      saveSettings(d, { blockVPN: !(d.settings?.blockVPN ?? true) })
-                    }
-                  >
-                    VPN
-                  </Pill>
+                  <Pill active={!!d.settings?.blockAdult} disabled={locked || busy}
+                        onClick={() => saveSettings(d, { blockAdult: !(d.settings?.blockAdult ?? true) })}>Adult</Pill>
+                  <Pill active={!!d.settings?.blockGambling} disabled={locked || busy}
+                        onClick={() => saveSettings(d, { blockGambling: !(d.settings?.blockGambling ?? true) })}>Gambling</Pill>
+                  <Pill active={!!d.settings?.blockSocial} disabled={locked || busy}
+                        onClick={() => saveSettings(d, { blockSocial: !(d.settings?.blockSocial ?? false) })}>Social</Pill>
+                  <Pill active={!!d.settings?.blockYouTube} disabled={locked || busy}
+                        onClick={() => saveSettings(d, { blockYouTube: !(d.settings?.blockYouTube ?? false) })}>YouTube</Pill>
+                  <Pill active={!!d.settings?.blockVPN} disabled={locked || busy}
+                        onClick={() => saveSettings(d, { blockVPN: !(d.settings?.blockVPN ?? true) })}>VPN</Pill>
                 </div>
-                {locked && (
-                  <p className="text-xs text-amber-300 mt-2">
-                    Device is locked — settings are temporarily read-only.
-                  </p>
-                )}
+                {locked && <p className="text-xs text-amber-300 mt-2">Device is locked — settings are temporarily read-only.</p>}
               </div>
             </SectionCard>
           );
