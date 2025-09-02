@@ -6,13 +6,21 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   const user = await requireUser(req);
   if (!user) return new Response("Unauthorized", { status: 401 });
 
-  const device = await prisma.device.findUnique({ where: { id: params.id } });
-  if (!device || device.userId !== user.id) return new Response("Not found", { status: 404 });
+  const device = await prisma.device.findFirst({
+    where: { id: params.id, userId: user.id },
+    include: { settings: true },
+  });
+  if (!device) return new Response("Not found", { status: 404 });
 
   const locked = !!(device.lockUntil && device.lockUntil > new Date());
   if (locked) return new Response("Device is locked and cannot be deleted", { status: 400 });
 
-  await prisma.device.delete({ where: { id: params.id } });
+  // Delete settings first, then device (transaction prevents FK violation)
+  await prisma.$transaction([
+    prisma.deviceSettings.deleteMany({ where: { deviceId: device.id } }),
+    prisma.device.delete({ where: { id: device.id } }),
+  ]);
+
   return new Response("Deleted", { status: 200 });
 }
 
