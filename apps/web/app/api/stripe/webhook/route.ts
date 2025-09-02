@@ -4,8 +4,7 @@ import Stripe from "stripe";
 
 export const runtime = "nodejs";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-});
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 export async function POST(req: NextRequest) {
   const sig = req.headers.get("stripe-signature");
@@ -28,7 +27,6 @@ export async function POST(req: NextRequest) {
     switch (event.type) {
       case "checkout.session.completed": {
         const s = event.data.object as Stripe.Checkout.Session;
-        // attach customer to our user if we set client_reference_id=userId in checkout
         const userId = (s.client_reference_id as string) || null;
         const customerId = (s.customer as string) || null;
         if (userId && customerId) {
@@ -39,35 +37,44 @@ export async function POST(req: NextRequest) {
         }
         break;
       }
+
       case "customer.subscription.created":
       case "customer.subscription.updated": {
         const sub = event.data.object as Stripe.Subscription;
-        // find user by customerId
         const customerId = (sub.customer as string) || null;
+
+        // Support snake_case or camelCase, depending on SDK/types
+        const periodEndUnix =
+          (sub as any).current_period_end ??
+          (sub as any).currentPeriodEnd ??
+          0;
+
         const user = await prisma.user.findFirst({
           where: { stripeCustomerId: customerId },
           select: { id: true },
         });
+
         if (user) {
           await prisma.subscription.upsert({
             where: { stripeSubId: sub.id },
             update: {
               userId: user.id,
               status: (sub.status || "incomplete").toUpperCase() as any,
-              currentPeriodEnd: new Date((sub.current_period_end || 0) * 1000),
+              currentPeriodEnd: new Date(Number(periodEndUnix) * 1000),
               plan: detectPlan(sub),
             },
             create: {
               stripeSubId: sub.id,
               userId: user.id,
               status: (sub.status || "incomplete").toUpperCase() as any,
-              currentPeriodEnd: new Date((sub.current_period_end || 0) * 1000),
+              currentPeriodEnd: new Date(Number(periodEndUnix) * 1000),
               plan: detectPlan(sub),
             },
           });
         }
         break;
       }
+
       case "customer.subscription.deleted": {
         const sub = event.data.object as Stripe.Subscription;
         await prisma.subscription.updateMany({
@@ -76,6 +83,7 @@ export async function POST(req: NextRequest) {
         });
         break;
       }
+
       case "invoice.payment_failed": {
         const inv = event.data.object as Stripe.Invoice;
         if (inv.subscription) {
@@ -86,23 +94,22 @@ export async function POST(req: NextRequest) {
         }
         break;
       }
+
       default:
-        // ignore other events
         break;
     }
 
     return new Response("ok", { status: 200 });
   } catch (err: any) {
-    console.error("WEBHOOK_HANDLER_ERROR", event.type, err?.message || err);
+    console.error("WEBHOOK_HANDLER_ERROR", event?.type, err?.message || err);
     return new Response("hook error", { status: 500 });
   }
 }
 
-// Map Stripe items -> our Plan enum
 function detectPlan(sub: Stripe.Subscription) {
   const priceId =
     sub.items?.data?.[0]?.price?.id ||
-    sub.items?.data?.[0]?.plan?.id || // legacy
+    (sub.items?.data?.[0] as any)?.plan?.id ||
     "";
   if (priceId === process.env.STRIPE_PRICE_MONTHLY) return "MONTHLY";
   if (priceId === process.env.STRIPE_PRICE_QUARTERLY) return "QUARTERLY";
