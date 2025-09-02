@@ -1,30 +1,24 @@
+import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth-lite";
 
-export async function GET(req: Request) {
+export async function POST(req: NextRequest) {
   const user = await requireUser(req);
-  const devices = await prisma.device.findMany({
-    where: { userId: user.id },
-    include: { settings: true },
-  });
-  return Response.json(devices);
-}
+  if (!user) return new Response("Unauthorized", { status: 401 });
 
-export async function POST(req: Request) {
-  const user = await requireUser(req);
-  const count = await prisma.device.count({ where: { userId: user.id } });
-  const max = Number(process.env.MAX_DEVICES || 3);
-  if (count >= max) return new Response("Device limit reached", { status: 400 });
+  const { platform, name } = await req.json();
 
-  const { name, platform } = await req.json();
+  if (!name) {
+    return new Response("Device name is required", { status: 400 });
+  }
+
   const device = await prisma.device.create({
     data: {
       userId: user.id,
-      name,
       platform,
-      settings: { create: {} },
+      name,
     },
-    include: { settings: true },
   });
+
   return Response.json(device);
 }
