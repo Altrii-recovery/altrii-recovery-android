@@ -13,7 +13,7 @@ export default async function Header() {
 
         {uid ? (
           <nav className="flex items-center gap-4">
-            <Link href="/dashboard/devices" className="hover:underline">Devices</Link>
+            <Link href="/devices" className="hover:underline">Devices</Link>
             <Link href="/dashboard/billing" className="hover:underline">Billing</Link>
           </nav>
         ) : (
