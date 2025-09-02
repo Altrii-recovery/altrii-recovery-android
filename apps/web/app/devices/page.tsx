@@ -66,8 +66,9 @@ export default function DevicesPage() {
   const [platform, setPlatform] = useState<Device["platform"]>("ANDROID");
   const canAdd = useMemo(() => name.trim().length > 0, [name]);
 
-  // Pending lock confirmation {deviceId, days}
-  const [pending, setPending] = useState<{ id: string; days: number } | null>(null);
+  // Pending actions
+  const [pendingLock, setPendingLock] = useState<{ id: string; days: number } | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const isLocked = (d: Device) => !!(d.lockUntil && new Date(d.lockUntil) > new Date());
@@ -85,11 +86,16 @@ export default function DevicesPage() {
     await mutate();
   }
 
-  async function deleteDevice(id: string) {
-    if (!confirm("Delete this device? This cannot be undone.")) return;
-    const res = await fetch(`/api/devices/${id}`, { method: "DELETE" });
-    if (!res.ok) return alert(await res.text().catch(() => "Delete failed (device may be locked)"));
-    await mutate();
+  async function confirmDelete(id: string) {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/devices/${id}`, { method: "DELETE" });
+      if (!res.ok) return alert(await res.text().catch(() => "Delete failed (device may be locked)"));
+      setPendingDeleteId(null);
+      await mutate();
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function confirmLock(id: string, days: number) {
@@ -102,7 +108,7 @@ export default function DevicesPage() {
         body: JSON.stringify({ lockUntil }),
       });
       if (!res.ok) return alert(await res.text().catch(() => "Lock failed"));
-      setPending(null);
+      setPendingLock(null);
       await mutate();
     } finally {
       setBusy(false);
@@ -174,7 +180,8 @@ export default function DevicesPage() {
       <div className="grid gap-4">
         {devices.map((d) => {
           const locked = isLocked(d);
-          const isPending = pending?.id === d.id;
+          const isLockPending = pendingLock?.id === d.id;
+          const isDeletePending = pendingDeleteId === d.id;
           return (
             <SectionCard key={d.id} className="space-y-4">
               <div className="flex items-start justify-between gap-3">
@@ -189,13 +196,13 @@ export default function DevicesPage() {
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
-                  {/* Step 1: choose duration (only when unlocked & not currently confirming) */}
-                  {!locked && !isPending && (
+                  {/* Lock presets (step 1) */}
+                  {!locked && !isLockPending && (
                     <div className="flex flex-wrap gap-1.5">
                       {[1, 7, 14, 21, 30].map((days) => (
                         <button
                           key={days}
-                          onClick={() => setPending({ id: d.id, days })}
+                          onClick={() => { setPendingDeleteId(null); setPendingLock({ id: d.id, days }); }}
                           className="rounded-md border border-indigo-500/40 bg-indigo-500/20 px-2.5 py-1.5 text-xs text-indigo-100 hover:bg-indigo-500/30"
                           title={`Lock for ${days} day(s)`}
                         >
@@ -205,11 +212,11 @@ export default function DevicesPage() {
                     </div>
                   )}
 
-                  {/* Step 2: confirm */}
-                  {isPending && (
+                  {/* Lock confirm (step 2) */}
+                  {isLockPending && (
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => confirmLock(d.id, pending!.days)}
+                        onClick={() => confirmLock(d.id, pendingLock!.days)}
                         disabled={busy}
                         className={clsx(
                           "rounded-lg px-3 py-2 text-sm font-medium border transition",
@@ -217,15 +224,12 @@ export default function DevicesPage() {
                           busy && "opacity-70 cursor-wait"
                         )}
                       >
-                        Confirm lock {pending!.days}d
+                        Confirm lock {pendingLock!.days}d
                       </button>
                       <button
-                        onClick={() => setPending(null)}
+                        onClick={() => setPendingLock(null)}
                         disabled={busy}
-                        className={clsx(
-                          "rounded-lg px-3 py-2 text-sm border transition",
-                          "bg-white/10 border-white/15 text-gray-200 hover:bg-white/15"
-                        )}
+                        className="rounded-lg px-3 py-2 text-sm border bg-white/10 border-white/15 text-gray-200 hover:bg-white/15"
                       >
                         Cancel
                       </button>
@@ -234,17 +238,44 @@ export default function DevicesPage() {
 
                   {locked && <span className="text-xs text-amber-300">Locked — unlocks {fmt(d.lockUntil)}</span>}
 
-                  <button
-                    onClick={() => deleteDevice(d.id)}
-                    disabled={locked || busy}
-                    className={clsx(
-                      "rounded-lg border px-3 py-2 text-sm transition",
-                      locked ? "border-white/15 bg-white/5 text-gray-400 cursor-not-allowed"
-                            : "border-rose-500/40 bg-rose-500/20 text-rose-200 hover:bg-rose-500/30"
-                    )}
-                  >
-                    Delete
-                  </button>
+                  {/* Delete step 1 → show confirm buttons */}
+                  {!isDeletePending && (
+                    <button
+                      onClick={() => { setPendingLock(null); setPendingDeleteId(d.id); }}
+                      disabled={locked || busy}
+                      className={clsx(
+                        "rounded-lg border px-3 py-2 text-sm transition",
+                        locked ? "border-white/15 bg-white/5 text-gray-400 cursor-not-allowed"
+                              : "border-rose-500/40 bg-rose-500/20 text-rose-200 hover:bg-rose-500/30"
+                      )}
+                    >
+                      Delete
+                    </button>
+                  )}
+
+                  {/* Delete confirm (step 2) */}
+                  {isDeletePending && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => confirmDelete(d.id)}
+                        disabled={busy}
+                        className={clsx(
+                          "rounded-lg px-3 py-2 text-sm font-medium border transition",
+                          "bg-rose-600 border-rose-600 text-white hover:bg-rose-500",
+                          busy && "opacity-70 cursor-wait"
+                        )}
+                      >
+                        Confirm delete
+                      </button>
+                      <button
+                        onClick={() => setPendingDeleteId(null)}
+                        disabled={busy}
+                        className="rounded-lg px-3 py-2 text-sm border bg-white/10 border-white/15 text-gray-200 hover:bg-white/15"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 
