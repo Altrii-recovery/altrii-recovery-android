@@ -28,16 +28,28 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 function SectionCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <section className={clsx(
-      "rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm",
-      "shadow-md p-5 sm:p-6", className
-    )}>
+    <section
+      className={clsx(
+        "rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm shadow-md p-5 sm:p-6",
+        className
+      )}
+    >
       {children}
     </section>
   );
 }
 
-function Pill({ active, children, onClick, disabled }: { active: boolean; children: React.ReactNode; onClick?: () => void; disabled?: boolean }) {
+function Pill({
+  active,
+  children,
+  onClick,
+  disabled,
+}: {
+  active: boolean;
+  children: React.ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+}) {
   return (
     <button
       type="button"
@@ -45,7 +57,9 @@ function Pill({ active, children, onClick, disabled }: { active: boolean; childr
       onClick={onClick}
       className={clsx(
         "rounded-full px-3 py-1 text-sm border transition",
-        active ? "bg-indigo-600 text-white border-indigo-600" : "bg-transparent text-gray-200 hover:bg-white/10 border-white/15",
+        active
+          ? "bg-indigo-600 text-white border-indigo-600"
+          : "bg-transparent text-gray-200 hover:bg-white/10 border-white/15",
         disabled && "opacity-50 cursor-not-allowed"
       )}
     >
@@ -66,14 +80,12 @@ export default function DevicesPage() {
   const { data, mutate } = useSWR<Device[]>("/api/devices", fetcher);
   const devices = data || [];
 
-  // Add device state
+  // Add device
   const [name, setName] = useState("");
   const [platform, setPlatform] = useState<Device["platform"]>("ANDROID");
   const canAdd = useMemo(() => name.trim().length > 0, [name]);
 
-  function isLocked(d: Device) {
-    return !!(d.lockUntil && new Date(d.lockUntil) > new Date());
-  }
+  const isLocked = (d: Device) => !!(d.lockUntil && new Date(d.lockUntil) > new Date());
   const fmt = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateString() : "—");
 
   async function addDevice() {
@@ -95,13 +107,11 @@ export default function DevicesPage() {
     await mutate();
   }
 
-  async function lockDevice(id: string) {
-    const input = prompt("Lock for how many days? (1–30)");
-    if (!input) return;
-    const days = Math.max(1, Math.min(30, Math.floor(Number(input))));
-    if (!Number.isFinite(days)) return alert("Please enter a number 1–30.");
-    if (!confirm(`Are you sure you want to lock for ${days} day(s)? You won't be able to change or delete it until it expires.`)) return;
-
+  async function lockForDays(id: string, days: number) {
+    const ok = confirm(
+      `Lock this device for ${days} day(s)?\n\nWhile locked you cannot change settings or delete the device.`
+    );
+    if (!ok) return;
     const lockUntil = new Date(Date.now() + days * 86400_000).toISOString();
     const res = await fetch(`/api/devices/${id}`, {
       method: "PATCH",
@@ -134,7 +144,9 @@ export default function DevicesPage() {
     <div className="mx-auto max-w-5xl space-y-8">
       <header>
         <h1 className="text-3xl font-semibold text-white">Devices</h1>
-        <p className="text-gray-300 mt-1">Register devices, toggle their blocking, and lock them for a focus period.</p>
+        <p className="text-gray-300 mt-1">
+          Register devices, toggle their blocking, and lock them for a focus period.
+        </p>
       </header>
 
       {/* Add Device */}
@@ -165,7 +177,9 @@ export default function DevicesPage() {
             disabled={!canAdd}
             className={clsx(
               "rounded-lg px-4 py-2 font-medium border transition",
-              canAdd ? "bg-indigo-600 border-indigo-600 text-white hover:bg-indigo-500" : "bg-white/10 border-white/15 text-gray-300 cursor-not-allowed"
+              canAdd
+                ? "bg-indigo-600 border-indigo-600 text-white hover:bg-indigo-500"
+                : "bg-white/10 border-white/15 text-gray-300 cursor-not-allowed"
             )}
           >
             Add device
@@ -189,13 +203,29 @@ export default function DevicesPage() {
                     Registered {fmt(d.registeredAt)} • Lock until: {fmt(d.lockUntil)}
                   </p>
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => lockDevice(d.id)}
-                    className="rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm text-gray-200 hover:bg-white/15"
-                  >
-                    {locked ? "Extend lock" : "Lock"}
-                  </button>
+
+                <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+                  {/* Lock presets show only when unlocked */}
+                  {!locked && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {[1, 7, 14, 21, 30].map((days) => (
+                        <button
+                          key={days}
+                          onClick={() => lockForDays(d.id, days)}
+                          className="rounded-md border border-indigo-500/40 bg-indigo-500/20 px-2.5 py-1.5 text-xs text-indigo-100 hover:bg-indigo-500/30"
+                          title={`Lock for ${days} day(s)`}
+                        >
+                          {days}d
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {locked && (
+                    <span className="text-xs text-amber-300">
+                      Locked — unlocks {fmt(d.lockUntil)}
+                    </span>
+                  )}
+
                   <button
                     onClick={() => deleteDevice(d.id)}
                     disabled={locked}
@@ -217,35 +247,45 @@ export default function DevicesPage() {
                   <Pill
                     active={!!d.settings?.blockAdult}
                     disabled={locked}
-                    onClick={() => saveSettings(d, { blockAdult: !(d.settings?.blockAdult ?? true) })}
+                    onClick={() =>
+                      saveSettings(d, { blockAdult: !(d.settings?.blockAdult ?? true) })
+                    }
                   >
                     Adult
                   </Pill>
                   <Pill
                     active={!!d.settings?.blockGambling}
                     disabled={locked}
-                    onClick={() => saveSettings(d, { blockGambling: !(d.settings?.blockGambling ?? true) })}
+                    onClick={() =>
+                      saveSettings(d, { blockGambling: !(d.settings?.blockGambling ?? true) })
+                    }
                   >
                     Gambling
                   </Pill>
                   <Pill
                     active={!!d.settings?.blockSocial}
                     disabled={locked}
-                    onClick={() => saveSettings(d, { blockSocial: !(d.settings?.blockSocial ?? false) })}
+                    onClick={() =>
+                      saveSettings(d, { blockSocial: !(d.settings?.blockSocial ?? false) })
+                    }
                   >
                     Social
                   </Pill>
                   <Pill
                     active={!!d.settings?.blockYouTube}
                     disabled={locked}
-                    onClick={() => saveSettings(d, { blockYouTube: !(d.settings?.blockYouTube ?? false) })}
+                    onClick={() =>
+                      saveSettings(d, { blockYouTube: !(d.settings?.blockYouTube ?? false) })
+                    }
                   >
                     YouTube
                   </Pill>
                   <Pill
                     active={!!d.settings?.blockVPN}
                     disabled={locked}
-                    onClick={() => saveSettings(d, { blockVPN: !(d.settings?.blockVPN ?? true) })}
+                    onClick={() =>
+                      saveSettings(d, { blockVPN: !(d.settings?.blockVPN ?? true) })
+                    }
                   >
                     VPN
                   </Pill>
