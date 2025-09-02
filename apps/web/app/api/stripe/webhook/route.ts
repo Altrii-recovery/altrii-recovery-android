@@ -3,21 +3,25 @@ import { NextRequest } from "next/server";
 import Stripe from "stripe";
 
 export const runtime = "nodejs";
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+export const dynamic = "force-dynamic"; // don't pre-render
 
 export async function POST(req: NextRequest) {
+  if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_WEBHOOK_SECRET) {
+    console.error("WEBHOOK_ENV_MISSING",
+      { hasKey: !!process.env.STRIPE_SECRET_KEY, hasSecret: !!process.env.STRIPE_WEBHOOK_SECRET });
+    return new Response("server not configured", { status: 500 });
+  }
+
+  // Lazily create Stripe client at request time (so build doesn't need secrets)
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
   const sig = req.headers.get("stripe-signature");
   if (!sig) return new Response("Missing signature", { status: 400 });
 
   let event: Stripe.Event;
   try {
     const raw = await req.text();
-    event = stripe.webhooks.constructEvent(
-      raw,
-      sig,
-      process.env.STRIPE_WEBHOOK_SECRET!
-    );
+    event = stripe.webhooks.constructEvent(raw, sig, process.env.STRIPE_WEBHOOK_SECRET);
   } catch (err: any) {
     console.error("WEBHOOK_VERIFY_ERROR", err?.message || err);
     return new Response("Bad signature", { status: 400 });
@@ -43,7 +47,6 @@ export async function POST(req: NextRequest) {
         const sub = event.data.object as Stripe.Subscription;
         const customerId = (sub.customer as string) || null;
 
-        // Support snake_case or camelCase, depending on SDK/types
         const periodEndUnix =
           (sub as any).current_period_end ??
           (sub as any).currentPeriodEnd ??
@@ -86,7 +89,6 @@ export async function POST(req: NextRequest) {
 
       case "invoice.payment_failed": {
         const inv = event.data.object as Stripe.Invoice;
-        // Be defensive: some newer typings don’t expose .subscription directly
         const subId =
           (inv as any).subscription ??
           (inv as any).subscriptionId ??
@@ -104,7 +106,6 @@ export async function POST(req: NextRequest) {
       default:
         break;
     }
-
     return new Response("ok", { status: 200 });
   } catch (err: any) {
     console.error("WEBHOOK_HANDLER_ERROR", event?.type, err?.message || err);
