@@ -1,107 +1,112 @@
-import Stripe from "stripe";
 import { prisma } from "@/lib/db";
+import { NextRequest } from "next/server";
+import Stripe from "stripe";
 
-// Ensure Node runtime so we can read raw body
 export const runtime = "nodejs";
 
-function asSubscription(x: any): Stripe.Subscription {
-  // Handle both Response<Subscription> and Subscription
-  return (x && x.data && x.data.object === "subscription") ? x.data as Stripe.Subscription : x as Stripe.Subscription;
-}
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+});
 
-// TS-safe getter for current period end (Stripe types vary by SDK/API version)
-function getCurrentPeriodEnd(sub: any): Date {
-  const t =
-    sub?.current_period_end ??
-    sub?.current_period_end_at ??  // some SDKs
-    sub?.currentPeriodEnd ??       // very new camelCase
-    0;
-  const n = Number(t) || 0;
-  // If Stripe returns ms in the future (unlikely here), normalize
-  return new Date(n > 1e12 ? n : n * 1000);
-}
-
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   const sig = req.headers.get("stripe-signature");
-  const rawBody = await req.text();
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+  if (!sig) return new Response("Missing signature", { status: 400 });
 
   let event: Stripe.Event;
   try {
-    event = stripe.webhooks.constructEvent(rawBody, sig!, process.env.STRIPE_WEBHOOK_SECRET!);
+    const raw = await req.text();
+    event = stripe.webhooks.constructEvent(
+      raw,
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET!
+    );
   } catch (err: any) {
-    return new Response(`Webhook Error: ${err.message}`, { status: 400 });
+    console.error("WEBHOOK_VERIFY_ERROR", err?.message || err);
+    return new Response("Bad signature", { status: 400 });
   }
 
-  switch (event.type) {
-    case "checkout.session.completed": {
-      const s = event.data.object as Stripe.Checkout.Session;
-      if (s.mode === "subscription" && s.customer && s.subscription) {
-        const customerId = typeof s.customer === "string" ? s.customer : s.customer.id;
-        const subId = typeof s.subscription === "string" ? s.subscription : s.subscription.id;
-
-        const user = await prisma.user.findFirst({ where: { stripeCustomerId: customerId } });
+  try {
+    switch (event.type) {
+      case "checkout.session.completed": {
+        const s = event.data.object as Stripe.Checkout.Session;
+        // attach customer to our user if we set client_reference_id=userId in checkout
+        const userId = (s.client_reference_id as string) || null;
+        const customerId = (s.customer as string) || null;
+        if (userId && customerId) {
+          await prisma.user.update({
+            where: { id: userId },
+            data: { stripeCustomerId: customerId },
+          });
+        }
+        break;
+      }
+      case "customer.subscription.created":
+      case "customer.subscription.updated": {
+        const sub = event.data.object as Stripe.Subscription;
+        // find user by customerId
+        const customerId = (sub.customer as string) || null;
+        const user = await prisma.user.findFirst({
+          where: { stripeCustomerId: customerId },
+          select: { id: true },
+        });
         if (user) {
-          const subRaw = await stripe.subscriptions.retrieve(subId);
-          const sub = asSubscription(subRaw);
           await prisma.subscription.upsert({
             where: { stripeSubId: sub.id },
             update: {
-              status: (sub.status as string).toUpperCase() as any,
-              currentPeriodEnd: getCurrentPeriodEnd(sub),
-              plan: detectPlanFromItems(sub),
+              userId: user.id,
+              status: (sub.status || "incomplete").toUpperCase() as any,
+              currentPeriodEnd: new Date((sub.current_period_end || 0) * 1000),
+              plan: detectPlan(sub),
             },
             create: {
-              userId: user.id,
               stripeSubId: sub.id,
-              status: (sub.status as string).toUpperCase() as any,
-              currentPeriodEnd: getCurrentPeriodEnd(sub),
-              plan: detectPlanFromItems(sub),
+              userId: user.id,
+              status: (sub.status || "incomplete").toUpperCase() as any,
+              currentPeriodEnd: new Date((sub.current_period_end || 0) * 1000),
+              plan: detectPlan(sub),
             },
           });
         }
+        break;
       }
-      break;
+      case "customer.subscription.deleted": {
+        const sub = event.data.object as Stripe.Subscription;
+        await prisma.subscription.updateMany({
+          where: { stripeSubId: sub.id },
+          data: { status: "CANCELED" as any },
+        });
+        break;
+      }
+      case "invoice.payment_failed": {
+        const inv = event.data.object as Stripe.Invoice;
+        if (inv.subscription) {
+          await prisma.subscription.updateMany({
+            where: { stripeSubId: String(inv.subscription) },
+            data: { status: "PAST_DUE" as any },
+          });
+        }
+        break;
+      }
+      default:
+        // ignore other events
+        break;
     }
-    case "customer.subscription.updated":
-    case "customer.subscription.deleted": {
-      const sub = asSubscription(event.data.object as any);
-      const plan = detectPlanFromItems(sub);
-      await prisma.subscription.upsert({
-        where: { stripeSubId: sub.id },
-        update: {
-          status: (sub.status as string).toUpperCase() as any,
-          currentPeriodEnd: getCurrentPeriodEnd(sub),
-          plan,
-        },
-        create: {
-          userId: await findUserIdByCustomer(sub.customer),
-          stripeSubId: sub.id,
-          status: (sub.status as string).toUpperCase() as any,
-          currentPeriodEnd: getCurrentPeriodEnd(sub),
-          plan,
-        },
-      });
-      break;
-    }
-  }
 
-  return new Response("ok");
+    return new Response("ok", { status: 200 });
+  } catch (err: any) {
+    console.error("WEBHOOK_HANDLER_ERROR", event.type, err?.message || err);
+    return new Response("hook error", { status: 500 });
+  }
 }
 
-// Helpers
-function detectPlanFromItems(sub: Stripe.Subscription) {
-  const priceId = sub.items?.data?.[0]?.price?.id || "";
+// Map Stripe items -> our Plan enum
+function detectPlan(sub: Stripe.Subscription) {
+  const priceId =
+    sub.items?.data?.[0]?.price?.id ||
+    sub.items?.data?.[0]?.plan?.id || // legacy
+    "";
   if (priceId === process.env.STRIPE_PRICE_MONTHLY) return "MONTHLY";
   if (priceId === process.env.STRIPE_PRICE_QUARTERLY) return "QUARTERLY";
   if (priceId === process.env.STRIPE_PRICE_SEMIANNUAL) return "SEMIANNUAL";
   if (priceId === process.env.STRIPE_PRICE_ANNUAL) return "ANNUAL";
   return "MONTHLY";
-}
-
-async function findUserIdByCustomer(customer: string | Stripe.Customer | Stripe.DeletedCustomer | null | undefined): Promise<string> {
-  const customerId = typeof customer === "string" ? customer : (customer as any)?.id;
-  if (!customerId) return "";
-  const user = await prisma.user.findFirst({ where: { stripeCustomerId: customerId } });
-  return user?.id || "";
 }
