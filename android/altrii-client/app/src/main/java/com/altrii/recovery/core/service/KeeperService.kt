@@ -14,7 +14,7 @@ class KeeperService : Service() {
         val notif = NotificationCompat.Builder(this, CHANNEL)
             .setContentTitle("Altrii Recovery")
             .setContentText("Protection standby")
-            .setSmallIcon(android.R.drawable.stat_sys_vpn_ic)
+            .setSmallIcon(R.mipmap.ic_launcher)
             .setOngoing(true)
             .build()
         startForeground(NOTIF_ID, notif)
