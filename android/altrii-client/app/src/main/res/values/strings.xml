@@ -1,0 +1,5 @@
+<resources>
+  <!-- For a real phone, set your Railway URL (e.g., https://your-app.up.railway.app) -->
+  <!-- For Android emulator, use http://10.0.2.2:3000 -->
+  <string name="altrii_base_url">https://YOUR-RAILWAY-APP-URL</string>
+</resources>
