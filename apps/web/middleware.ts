@@ -1,32 +1,24 @@
-import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { getToken } from "next-auth/jwt";
+import { NextResponse } from "next/server";
 
-const PUBLIC_PREFIXES = [
-  "/auth/signin",
-  "/auth/signup",
-  "/api/auth",              // next-auth internal
-  "/api/stripe/webhook",
-  "/api/health",
-  "/_next", "/favicon.ico", "/assets", "/images"
-];
-
-export async function middleware(req: NextRequest) {
+export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) return NextResponse.next();
 
-  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-  const isAuthed = Boolean((token as any)?.uid);
-
-  if (!isAuthed) {
-    const url = req.nextUrl.clone(); url.pathname = "/auth/signup"; return NextResponse.redirect(url);
-  }
-
-  if (pathname.startsWith("/dashboard/billing") || pathname.startsWith("/api/billing")) {
+  // Always allow API, Next.js assets, favicon, and auth pages
+  if (
+    pathname.startsWith("/api") ||
+    pathname.startsWith("/_next") ||
+    pathname === "/favicon.ico" ||
+    pathname.startsWith("/auth")
+  ) {
     return NextResponse.next();
   }
 
+  // Add any page-only guards here (e.g., require auth for /dashboard)
   return NextResponse.next();
 }
 
-export const config = { matcher: ["/((?!api/stripe/webhook).*)"] };
+// IMPORTANT: exclude API/static/auth so middleware doesn't run for them
+export const config = {
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|auth).*)"],
+};
