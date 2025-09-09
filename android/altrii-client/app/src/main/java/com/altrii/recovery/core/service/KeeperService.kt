@@ -1,3 +1,4 @@
+import com.altrii.recovery.core.sync.DeviceStatePoller
 package com.altrii.recovery.core.service
 
 import android.app.*
@@ -9,6 +10,7 @@ import com.altrii.recovery.vpn.AltriiVpnService
 
 class KeeperService : Service() {
     override fun onCreate() {
+        DeviceStatePoller.start(this)
         super.onCreate()
         createChannel()
         val notif = NotificationCompat.Builder(this, CHANNEL)
