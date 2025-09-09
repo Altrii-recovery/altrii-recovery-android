@@ -20,6 +20,8 @@ model User {
   devices          Device[]
   sessions         Session[]
   subscriptions    Subscription[]
+  preferredLockMinutes Int @default(60)
+
 }
 
 model Device {

@@ -9,10 +9,7 @@ export default function Billing() {
       setLoading('checkout');
       const res = await fetch('/api/billing/checkout', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user': 'dev@example.com', // DEV auth header
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ plan }),
       });
       const { url } = await res.json();
@@ -27,7 +24,7 @@ export default function Billing() {
       setLoading('portal');
       const res = await fetch('/api/billing/create-portal', {
         method: 'POST',
-        headers: { 'x-user': 'dev@example.com' }, // DEV auth header
+        headers: { 'Content-Type': 'application/json' },
       });
       const { url } = await res.json();
       window.location.href = url;
@@ -39,18 +36,23 @@ export default function Billing() {
   return (
     <div className="card p-6 max-w-2xl">
       <h1 className="text-2xl font-semibold">Manage Billing</h1>
-      <p className="text-[--muted] mt-2">Subscribe or open your customer portal.</p>
-
-      <div className="mt-6 grid grid-cols-2 gap-3">
-        <button className="btn-primary" disabled={loading==='checkout'} onClick={() => goCheckout('monthly')}>Subscribe – Monthly</button>
-        <button className="btn-ghost" disabled={loading==='checkout'} onClick={() => goCheckout('quarterly')}>Quarterly</button>
-        <button className="btn-ghost" disabled={loading==='checkout'} onClick={() => goCheckout('semiannual')}>6 Months</button>
-        <button className="btn-ghost" disabled={loading==='checkout'} onClick={() => goCheckout('annual')}>Annual</button>
-      </div>
-
-      <div className="mt-6">
-        <button className="btn-primary" onClick={openPortal} disabled={loading==='portal'}>
-          Open Customer Portal
+      <p className="text-[--muted] mt-2">
+        Subscribe or open your billing portal to manage your plan.
+      </p>
+      <div className="mt-4 flex flex-col gap-2">
+        <button
+          disabled={loading === 'checkout'}
+          onClick={() => goCheckout('monthly')}
+          className="btn-primary"
+        >
+          {loading === 'checkout' ? 'Loading…' : 'Subscribe Monthly'}
+        </button>
+        <button
+          disabled={loading === 'portal'}
+          onClick={openPortal}
+          className="btn-secondary"
+        >
+          {loading === 'portal' ? 'Loading…' : 'Open Billing Portal'}
         </button>
       </div>
     </div>
