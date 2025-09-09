@@ -7,115 +7,48 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id               String         @id @default(cuid())
-  email            String         @unique
-  createdAt        DateTime       @default(now())
-  emailVerified    DateTime?
-  passwordHash     String?
-  name             String?
-  stripeCustomerId String?        @unique
-  updatedAt        DateTime       @updatedAt
-  accounts         Account[]
-  devices          Device[]
-  sessions         Session[]
-  subscriptions    Subscription[]
-  preferredLockMinutes Int @default(60)
-
-}
-
-model Device {
-  id           String          @id @default(cuid())
-  userId       String
-  name         String
-  lastSeenAt   DateTime?
-  lockUntil    DateTime?
-  registeredAt DateTime        @default(now())
-  platform     Platform
-  user         User            @relation(fields: [userId], references: [id])
-  settings     DeviceSettings?
-}
-
-model DeviceSettings {
-  id            String   @id @default(cuid())
-  deviceId      String   @unique
-  blockAdult    Boolean  @default(true)
-  blockGambling Boolean  @default(true)
-  blockSocial   Boolean  @default(false)
-  blockYouTube  Boolean  @default(false)
-  blockVPN      Boolean  @default(true)
-  rulesVersion  Int      @default(1)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  device        Device   @relation(fields: [deviceId], references: [id])
-}
-
-model Subscription {
-  id               String    @id @default(cuid())
-  userId           String
-  currentPeriodEnd DateTime
-  createdAt        DateTime  @default(now())
-  stripeSubId      String    @unique
-  updatedAt        DateTime  @updatedAt
-  plan             Plan
-  status           SubStatus
-  user             User      @relation(fields: [userId], references: [id])
-}
-
-model Account {
-  id                String  @id @default(cuid())
-  userId            String
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String?
-  access_token      String?
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String?
-  session_state     String?
-  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-}
-
-model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
-
-  @@unique([identifier, token])
-}
-
 enum Platform {
   ANDROID
   IOS
-  MACOS
-  WINDOWS
+  OTHER
 }
 
-enum Plan {
-  MONTHLY
-  QUARTERLY
-  SEMIANNUAL
-  ANNUAL
+model User {
+  id                   String @id @default(cuid())
+  email                String @unique
+  preferredLockMinutes Int    @default(60)
+
+  devices Device[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
-enum SubStatus {
-  INCOMPLETE
-  INCOMPLETE_EXPIRED
-  TRIALING
-  ACTIVE
-  PAST_DUE
-  CANCELED
-  UNPAID
+model Device {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name     String?
+  platform Platform @default(ANDROID)
+
+  settings DeviceSettings?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model DeviceSettings {
+  deviceId String @id
+  device   Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  blockAdult    Boolean @default(true)
+  blockSocial   Boolean @default(false)
+  blockYouTube  Boolean @default(false)
+  blockGambling Boolean @default(false)
+  blockVpn      Boolean @default(false)
+
+  updatedAt DateTime @updatedAt
 }
