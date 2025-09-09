@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { signLockToken } from "@/lib/jwt";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth-options";
+import { requireUser } from "@/lib/auth-lite";
+import { prisma } from "@/lib/db";
 
 const Body = z.object({
   lockUntil: z.string().datetime().optional(),
@@ -10,37 +10,37 @@ const Body = z.object({
   reason: z.string().optional(),
 });
 
-interface Params { params: { id: string } }
-
-function getUserId(session: any): string | null {
-  const sUser = session?.user as { id?: string | null; email?: string | null } | undefined;
-  return sUser?.id ?? sUser?.email ?? process.env.DEV_USER_ID ?? null;
-}
-
-export async function POST(req: Request, { params }: Params) {
+export async function POST(req: Request, { params }: { params: { id: string } }) {
   try {
-    const session = await getServerSession(authOptions);
-    const userId = getUserId(session);
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized (no session and no DEV_USER_ID)" }, { status: 401 });
-    }
+    const user = await requireUser(req);
+    if (!user) return new Response("Unauthorized", { status: 401 });
 
-    const body = Body.safeParse(await req.json().catch(() => ({})));
-    if (!body.success) {
-      return NextResponse.json({ error: "Invalid body", details: body.error.flatten() }, { status: 400 });
-    }
+    const device = await prisma.device.findFirst({
+      where: { id: params.id, userId: user.id },
+      include: { user: true },
+    });
+    if (!device) return new Response("Not found", { status: 404 });
 
-    const deviceId = params.id;
+    const raw = await req.json();
+    const body = Body.parse(raw);
+
     const now = new Date();
-    const until = body.data.lockUntil ? new Date(body.data.lockUntil)
-      : new Date(now.getTime() + (body.data.durationMinutes ?? 60) * 60 * 1000);
+    const until =
+      body.lockUntil
+        ? new Date(body.lockUntil)
+        : new Date(now.getTime() + (body.durationMinutes ?? 60) * 60 * 1000);
 
     const token = await signLockToken({
-      deviceId,
-      ownerId: userId,
+      deviceId: device.id,
+      ownerId: device.userId,
       aud: "altrii-device",
       lockUntil: Math.floor(until.getTime() / 1000),
       issuedAtServer: Math.floor(now.getTime() / 1000),
+    });
+
+    await prisma.device.update({
+      where: { id: device.id },
+      data: { lockUntil: until },
     });
 
     return NextResponse.json({ token, lockUntil: until.toISOString() }, { status: 200 });

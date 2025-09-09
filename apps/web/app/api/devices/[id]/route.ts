@@ -2,8 +2,8 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth-lite";
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  const user = await requireUser(req);
+export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+  const user = await requireUser(_req as unknown as Request);
   if (!user) return new Response("Unauthorized", { status: 401 });
 
   const device = await prisma.device.findFirst({
@@ -12,23 +12,14 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   });
   if (!device) return new Response("Not found", { status: 404 });
 
-  const locked = !!(device.lockUntil && device.lockUntil > new Date());
-  if (locked) return new Response("Device is locked and cannot be deleted", { status: 400 });
-
-  // Delete settings first, then device (transaction prevents FK violation)
-  await prisma.$transaction([
-    prisma.deviceSettings.deleteMany({ where: { deviceId: device.id } }),
-    prisma.device.delete({ where: { id: device.id } }),
-  ]);
-
-  return new Response("Deleted", { status: 200 });
+  return Response.json(device);
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const user = await requireUser(req);
+  const user = await requireUser(req as unknown as Request);
   if (!user) return new Response("Unauthorized", { status: 401 });
 
-  const body = await req.json().catch(() => ({}));
+  const body = await req.json();
   const iso: string = String(body?.lockUntil || "");
   const date = iso ? new Date(iso) : null;
 
@@ -42,4 +33,23 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   });
 
   return Response.json(updated);
+}
+
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  const user = await requireUser(req as unknown as Request);
+  if (!user) return new Response("Unauthorized", { status: 401 });
+
+  const device = await prisma.device.findFirst({
+    where: { id: params.id, userId: user.id },
+    include: { settings: true },
+  });
+  if (!device) return new Response("Not found", { status: 404 });
+
+  const locked = !!(device.lockUntil && device.lockUntil > new Date());
+  if (locked) return new Response("Device is locked and cannot be deleted", { status: 400 });
+
+  await prisma.deviceSettings.deleteMany({ where: { deviceId: device.id } }).catch(() => {});
+  await prisma.device.delete({ where: { id: device.id } });
+
+  return new Response(null, { status: 204 });
 }
