@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth-lite";
+import { hasActiveSub } from "@/lib/subscription";
 import { adult } from "@/lib/rules/adult";
 import { social } from "@/lib/rules/social";
 import { gambling } from "@/lib/rules/gambling";
@@ -10,6 +11,10 @@ import { vpn } from "@/lib/rules/vpn";
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   const user = await requireUser(req);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  // Require subscription to receive rules (adjust policy if needed)
+  const ok = await hasActiveSub(user.id);
+  if (!ok) return NextResponse.json({ error: "Subscription required" }, { status: 402 });
 
   // Ownership check
   const device = await prisma.device.findFirst({
