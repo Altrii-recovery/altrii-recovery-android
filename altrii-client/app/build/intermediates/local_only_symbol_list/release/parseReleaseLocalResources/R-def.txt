@@ -1,0 +1,19 @@
+R_DEF: Internal format may change without notice
+local
+id hello
+id lockBtn
+id refreshBtn
+id scanBtn
+id statusTv
+id stepBtn
+id stepDesc
+id stepStatus
+id stepTitle
+id stepsContainer
+id title
+layout _setup_step_row
+layout activity_main
+layout activity_provision
+layout activity_setup
+string altrii_base_url
+string app_name
