@@ -1,33 +1,34 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth-options";
+import { prisma } from "@/lib/db";
+import { requireUser } from "@/lib/auth-lite";
+import { adult } from "@/lib/rules/adult";
+import { social } from "@/lib/rules/social";
+import { gambling } from "@/lib/rules/gambling";
+import { youtube } from "@/lib/rules/youtube";
+import { vpn } from "@/lib/rules/vpn";
 
-interface Params { params: { id: string } }
+export async function GET(req: Request, { params }: { params: { id: string } }) {
+  const user = await requireUser(req);
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-export async function GET(_: Request, { params }: Params) {
-  // Allow stateless testing (DEV_USER_ID) or real session
-  const session = await getServerSession(authOptions);
-  const user = session?.user as { id?: string | null; email?: string | null } | undefined;
-  const userId = user?.id ?? user?.email ?? process.env.DEV_USER_ID ?? null;
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // Ownership check
+  const device = await prisma.device.findFirst({
+    where: { id: params.id, userId: user.id },
+    include: { settings: true },
+  });
+  if (!device) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  // Minimal stub rules — we’ll replace with real categories later
+  const s = device.settings;
+  const blocked = new Set<string>();
+  if (s?.blockAdult) adult.forEach(d => blocked.add(d));
+  if (s?.blockSocial) social.forEach(d => blocked.add(d));
+  if (s?.blockYouTube) youtube.forEach(d => blocked.add(d));
+  if (s?.blockGambling) gambling.forEach(d => blocked.add(d));
+  if (s?.blockVPN) vpn.forEach(d => blocked.add(d));
+
   const rules = {
-    deviceId: params.id,
-    version: 1,
-    updatedAt: new Date().toISOString(),
-    // Simple domain list to prove the flow; expand later
-    blockedDomains: [
-      "example.com",
-      "pornhub.com",
-      "xvideos.com",
-      "bet365.com",
-      "twitter.com",
-      "tiktok.com",
-      "instagram.com",
-      "youtube.com"   // we’ll refine per-app later
-    ]
+    version: s?.rulesVersion ?? 1,
+    blockedDomains: Array.from(blocked),
   };
-
   return NextResponse.json(rules);
 }
