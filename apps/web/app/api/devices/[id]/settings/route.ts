@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth-lite";
+import { hasActiveSub } from "@/lib/subscription";
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   const user = await requireUser(req);
@@ -17,6 +18,10 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   const user = await requireUser(req);
   if (!user) return new Response("Unauthorized", { status: 401 });
+
+  // Require subscription to update settings
+  const ok = await hasActiveSub(user.id);
+  if (!ok) return new Response("Subscription required", { status: 402 });
 
   const device = await prisma.device.findFirst({
     where: { id: params.id, userId: user.id },
