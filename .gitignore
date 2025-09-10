@@ -21,3 +21,7 @@ pnpm-debug.log*
 Thumbs.db
 .idea/
 .vscode/
+
+# never commit secrets
+.release_secrets/
+
